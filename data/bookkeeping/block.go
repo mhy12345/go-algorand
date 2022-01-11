@@ -653,7 +653,6 @@ func SignedTxnsToGroups(txns []transactions.SignedTxn) (res [][]transactions.Sig
 			res = append(res, lastGroup)
 			lastGroup = nil
 		}
-
 		lastGroup = append(lastGroup, tx)
 	}
 	if lastGroup != nil {

@@ -80,7 +80,7 @@ func (s *Server) Initialize(cfg config.Local, phonebookAddresses []string, genes
 	}
 	logWriter := logging.MakeCyclicFileWriter(liveLog, archive, cfg.LogSizeLimit, maxLogAge)
 	s.log.SetOutput(logWriter)
-	s.log.SetJSONFormatter()
+	//s.log.SetJSONFormatter()
 	s.log.SetLevel(logging.Level(cfg.BaseLoggerDebugLevel))
 	setupDeadlockLogger()
 

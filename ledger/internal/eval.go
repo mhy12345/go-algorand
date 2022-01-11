@@ -18,8 +18,10 @@ package internal
 
 import (
 	"context"
+	"crypto/sha512"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/algorand/go-algorand/config"
@@ -1305,6 +1307,30 @@ type evalTxValidator struct {
 	ctx      context.Context
 	txgroups [][]transactions.SignedTxnWithAD
 	done     chan error
+	log      logging.Logger
+}
+type TxnGroupsToSort [][]transactions.SignedTxnWithAD
+
+type BySeed struct {
+	TxnGroupsToSort
+	seed []byte
+}
+
+func (s TxnGroupsToSort) Len() int      { return len(s) }
+func (s TxnGroupsToSort) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s BySeed) Less(i, j int) bool {
+	n := sha512.Size256
+	var resA byte
+	var resB byte
+	for k := 0; k < n; k++ {
+		resA = s.TxnGroupsToSort[i][0].Txn.Sender[k] ^ s.seed[k]
+		resB = s.TxnGroupsToSort[j][0].Txn.Sender[k] ^ s.seed[k]
+		if resA != resB {
+			return resA < resB
+		}
+	}
+	return false
 }
 
 func (validator *evalTxValidator) run() {
@@ -1316,7 +1342,19 @@ func (validator *evalTxValidator) run() {
 
 	var unverifiedTxnGroups [][]transactions.SignedTxn
 	unverifiedTxnGroups = make([][]transactions.SignedTxn, 0, len(validator.txgroups))
-	for _, group := range validator.txgroups {
+
+	sortedTxnGroups := make([][]transactions.SignedTxnWithAD, 0, len(validator.txgroups))
+	sortedTxnGroups = append(sortedTxnGroups, validator.txgroups...)
+
+	validator.log.Infof("evalTxValidator : before sort txs %v", validator.txgroups)
+	seed := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		seed[i] = validator.block.BlockHeader.Seed[i]
+	}
+	sort.Sort(BySeed{sortedTxnGroups, seed})
+	validator.log.Infof("evalTxValidator : after sort txs %v", sortedTxnGroups)
+
+	for _, group := range sortedTxnGroups {
 		signedTxnGroup := make([]transactions.SignedTxn, len(group))
 		for j, txn := range group {
 			signedTxnGroup[j] = txn.SignedTxn
@@ -1390,6 +1428,7 @@ func Eval(ctx context.Context, l LedgerForEvaluator, blk bookkeeping.Block, vali
 		txvalidator.ctx = validationCtx
 		txvalidator.txgroups = paysetgroups
 		txvalidator.done = make(chan error, 1)
+		txvalidator.log = logging.Base()
 		go txvalidator.run()
 
 	}

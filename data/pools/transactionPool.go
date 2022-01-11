@@ -242,7 +242,6 @@ func (pool *TransactionPool) rememberCommit(flush bool) {
 		pool.ledger.VerifiedTransactionCache().UpdatePinned(pool.pendingTxids)
 	} else {
 		pool.pendingTxGroups = append(pool.pendingTxGroups, pool.rememberedTxGroups...)
-
 		for txid, txn := range pool.rememberedTxids {
 			pool.pendingTxids[txid] = txn
 		}
@@ -446,7 +445,6 @@ func (pool *TransactionPool) Remember(txgroup []transactions.SignedTxn) error {
 	if err := pool.checkPendingQueueSize(len(txgroup)); err != nil {
 		return err
 	}
-
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
